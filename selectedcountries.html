@@ -6,43 +6,53 @@
           <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.2.0/leaflet.css" type="text/css" crossorigin="">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.2.0/leaflet.js" crossorigin=""></script>
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+
+		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.5.1/dist/chart.min.js"></script>
 		<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.3/proj4.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.1/proj4leaflet.min.js"></script>
         <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.js"></script> -->
 
         <script src ="selectedboundaries4326.js"></script>
-		<script src ="disputedterritories.js"</script>
+		<script src ="disputedterritories.js"></script>
+		<script src ="worldAdminBoundaries.js"></script>
         <link rel="stylesheet" href="style.css" type="text/css">
-       
+	   </head>
+
+	   <body onload="init()">
+		<h1 id="title">Selected disputed territories for India, Pakistan, and China</h1>
+		<div id = "mapContainer">
+			<div id="mapid"></div>
+			
+			<div id="sidePane">
+				<div id="pieChartContainer">
+					<canvas id="pieChart"></canvas>
+				</div>
+				<div id="attributeTable"></div>
+				<div id="mapLegend"></div>
+			</div>
+		</div>
+
+		<!--<div id="summaryLabel"></div> -->
+
         <script type="text/javascript">
 
-	var map;
+	var map; //map object
+	var chart; //chart object
 
 	function init() {
    		// create map and set center and zoom level
    		map = new L.map('mapid');
-   		map.setView([34.0479, 76.7970], 5);
-   		
-		// create tile layer and add it to map
-		var tiles = L.tileLayer('https://personal.psu.edu/zjn5071/termProjTiles/TPBasemap/{z}/{x}/{y}.png');
-		tiles.addTo(map);
-
-		/*// create wms layer
- 		var selectedCountries = L.tileLayer.wms('http://localhost:8080/geoserver/termproject/wms', {
-			layers: 'termproject:sc_projected',
-			format: 'image/png',
-			transparent: true
-		}); 
 		
-		selectedCountries.addTo(map); */
+		map.setMinZoom(6);
+		map.setMaxZoom(11);
+   		map.setView([28.0479, 84.7970], 6);
 
-		/*var redBoundariesLayer = omnivore.kml('redBoundarieskml.kml').on('ready', function() {
-			map.fitBounds(runLayer.getBounds());            
-    
-			runLayer.eachLayer(function(layer) {            
-				layer.bindPopup(layer.feature.properties.description);
-				});
-			}).addTo(map); */
+		// create tile layer and add it to map
+		var tiles = L.tileLayer('https://zjn5071-geog585project.s3.us-east-2.amazonaws.com/newTiles/{z}/{x}/{y}.png');
+		tiles.addTo(map);
+		
+		//var bounds = tiles.getBounds();
+		//map.maxBounds(bounds);
 
 		//redBoundariesLayer and disputedTerritotiesLayer are the two GeoJSONs that will be used for this lesson.
 		var redBoundariesLayer;
@@ -50,68 +60,238 @@
 
 		var selection;
 		var selectedLayer;
+		
+		//This function creates the attribute table for both the red disputed boundaries and disputed territories layers. They each contain
+		//different attribute data to be selected and displayed.
+		function buildAttributeTable(feature) {
+			var attributeTable = '<h2>Attribute Table</h2>';  //create the header
+			attributeTable += '<table>'; //start the html table structure with "attributeTable"
+
+			// need if/else to check which layer the user selects.
+			if (selectedLayer === disputedTerritoriesLayer) {
+				var propertiesToShowDTL = ['POP_EST', 'BRK_NAME', 'NOTE_BRK'];  //disputed territories data list
+
+				//Loop through the list and append the properties to the attributeTable html structure defined above.
+				propertiesToShowDTL.forEach(function (property) {
+					attributeTable += '<tr>';
+					attributeTable += '<td><b>' + property + ':</b></td>';
+					attributeTable += '<td>' + feature.properties[property] + '</td>';
+					attributeTable += '</tr>';
+				});
+			} 
+			
+			//Do exactly the same thing for the red boundaries layer except with different data.
+			else if (selectedLayer === redBoundariesLayer) {
+				var propertiesToShowRBL = ['FCLASS_PK', 'BRK_NAME', 'NOTE'];
+
+				propertiesToShowRBL.forEach(function (property) {
+					attributeTable += '<tr>';
+					attributeTable += '<td><b>' + property + ':</b></td>';
+					attributeTable += '<td>' + feature.properties[property] + '</td>';
+					attributeTable += '</tr>';
+				});
+			}
+			document.getElementById('attributeTable').innerHTML = attributeTable; //update the attribute table div with the content inside attributeTable.
+		}
+		
+		//function to create a pie chart containing data for disputed territories populations. Follows the 
+		function buildPieChart(selectedFeature, disputedTerritoriesLayer) {
+		
+			var labelsList = []; //List for pei chart labels
+			var dataList = [];	//List for pie chart data
+			var backgroundColorsList = []; //List for the pie chart colors. More can be added.
+
+			// Retrieve data from necessary features in the disputed territories layer
+			disputedTerritoriesLayer.eachLayer(function (layer) {
+				labelsList.push(layer.feature.properties.BRK_NAME);
+				dataList.push(layer.feature.properties.POP_EST);
+			});
+
+			var unselectedStyle = '000000'; // Other territories displayed in the pie chart have no color for comparison. Due to the nature of the data
+											// Only three are really visisble in the piechart. 
+
+			// Loop through each disputed territory and assign color to the pie chart slices dpending on whether a disputed territory feature is selected or not
+			disputedTerritoriesLayer.eachLayer(function (layer, index) {
+				if (layer.feature === selectedFeature) {
+					backgroundColorsList.push('#0000FF'); // Set the color of the selected feature to blue
+				} else {
+					backgroundColorsList.push(unselectedStyle); // Set colors from the gradient for other features
+				}
+			});
+
+			// Create or update the pie chart using the extracted data and colors (stack overflow link helps to understand).
+			var ctx = document.getElementById('pieChart').getContext('2d');
+
+			//Check to see if there is already a chart. If not, generate a new one.
+			if (!chart) {
+			
+				//create the pie chart and add styling. This is a bit complicated so I had to use a significant amount of reference material, for example
+				//https://stackoverflow.com/questions/43675938/displaying-pie-chart-using-chart-js
+				chart = new Chart(ctx, {
+					type: 'pie',
+					data: {
+						labels: labelsList,
+						datasets: [{
+							label: 'Population Estimate',
+							data: dataList,
+							backgroundColor: backgroundColorsList,
+							borderWidth: 1
+						}]
+					},
+					options: {
+						responsive: true,
+						plugins: {
+							// There are l;egend configuration settings here: https://www.chartjs.org/docs/latest/configuration/legend.html. 
+							legend: {
+								position: 'left'
+							},
+							title: {
+								display: true,
+								text: 'Disputed Territories Population',
+								font: {
+									size: 10
+								}
+							}
+						},
+					}
+				});
+			} else {
+				// Update the existing pie chart if it exists (shouldn't have to do this theoretically but everything disappears if I don't?) strange...
+				chart.data.labels = labelsList;
+				chart.data.datasets[0].data = dataList;
+				chart.data.datasets[0].backgroundColor = backgroundColorsList;
+				chart.update();
+			}
+		}
+		
+		//Function creating a legend in the bottom left corner of the map using leaflet.
+		function createLegend() {
+			var div = L.DomUtil.create("div", "mapLegend");
+			div.innerHTML = "<h4>Legend</h4>" +
+				"<div><span class='legend-icon red-line'></span> Disputed Boundaries (polyline)</div>" +
+				"<div><span class='legend-icon green-rectangle'></span> Disputed Territories (polygon)</div>" +
+				"<div><span class='legend-icon black-line'></span> World Admin Boundaries (polyline)</div>" +
+				"<div><p> There are currently two interactive layers present in the map: the disputed red boundaries layer and the disputed territories (they become highlighted when you hover over them). You may click one of these layers to see its attribute data and a CHart.js pie chart representing its population with respect to the other disputed territories.</p></div>";
+				
+
+			document.getElementById("mapLegend").appendChild(div); //append the div element to the mapLegend using appendChild()
+		}
+		
+		//function called to reset the pie chart
+		function resetPieChart() {
+			if (chart) {
+				// Reset the chart data and colors
+				chart.data.datasets[0].data = [];
+				chart.data.datasets[0].backgroundColor = [];
+				chart.update();
+			}
+		}
 
 		//styling for redBoundaries when it is not clicked
 		function redBoundariesStyle(feature) {
 			return {
-				color: '#FF0000', 
-				weight: 3, 
-				opacity: 1, 
-				dashArray: '8 4', 
-				lineCap: 'round', 
-				className: 'glowing-line'
+				color: '#FF0000',
+				weight: 5, 
+				opacity: 1,
+				dashArray: '10 5', 
+				lineCap: 'round',
+			};
+		}
+		
+		function redBoundariesHoverStyle(feature) {
+			return {
+				color: '#FF0000',
+				weight: 7, 
+				opacity: 1,
+				dashArray: '10 5', 
+				lineCap: 'round',
 			};
 		}
 
 		//styling for redBoundaries when it gets clicked
 		function redBoundariesSelectedStyle(feature){
 			return {
-				color: '#008080', 
-				weight: 2, 
-				opacity: 1, 
-				dashArray: '8 4', 
-				lineCap: 'round', 
-				className: 'glowing-line'
+				color: '#008080',
+				weight: 2,
+				opacity: 1,
+				dashArray: '8 4',
+				lineCap: 'round',				
 			};
 		}
+		
+		// Handle mouseover event on redBoundaries layer. Hightlights
+		function redBoundariesOnMouseOver(e) {
+			var layer = e.target;
+			layer.setStyle(redBoundariesHoverStyle(layer.feature));
+		}
 
-		// handle click events on disputed territories
+		// handle click events and hover events on disputed red boundaries. Same as lesson 7 code minus mouseover/mouseout.
 		function redBoundariesOnEachFeature(feature, layer){
 			layer.on({
 				click: function(e) {
-					if (selection) {            
+					if (selection) {
 						resetStyles();
 					}
-              
-					e.target.setStyle(redBoundariesSelectedStyle);
+
+					e.target.setStyle(redBoundariesSelectedStyle(feature));
 					selection = e.target;
 					selectedLayer = redBoundariesLayer;
 
 					// Insert some HTML with the feature name
-					buildSummaryLabel(feature);
+					//buildSummaryLabel(feature);
+
+					buildAttributeTable(feature);
 
 					L.DomEvent.stopPropagation(e); // stop click event from being propagated further
-				}
+				},
+				// if the layer is not selected set the style to redBoundariesHoverStyle during a mousover event.
+				mouseover: function (e) {
+					var layer = e.target;
+					if (layer !== selection) {
+						layer.setStyle(redBoundariesHoverStyle(feature));
+					}
+				},
+				
+				//mouseout event resets the style to its normal state when the user is not hovering over it with the mouse cursor.
+				mouseout: function (e) {
+					var layer = e.target;
+					if (layer !== selection) {
+						layer.setStyle(redBoundariesStyle(feature));
+					}
+				},
 			});
 		}
 
 		// add the disputed red boundaries GeoJSON js file contents stored in redBoundariesGeoJSON variable
-		redBoundariesLayer = new L.geoJSON(redBoundariesGeoJSON,{
+		redBoundariesLayer = new L.geoJSON(redBoundaries4326,{
 			style: redBoundariesStyle,
 			onEachFeature: redBoundariesOnEachFeature
 		});
-               
-		redBoundariesLayer.addTo(map);
+		
+		//Set the style for world admin boundaries.
+		function worldAdminStyle(feature){
+			return {
+				fillColor: 'none',
+				color: '#000000'
+			};
+		}
+		
+		// Declare worldAdminLayer as a GeoJSON
+		worldAdminLayer = new L.geoJSON(adminBoundaries, {
+			style: worldAdminStyle
+		});
+
 
 		// define the styles for the disputed boundaries (unselected and selected)
-          function disputedTerritories(feature) {
+        function disputedTerritories(feature) {
             return {
-               fillColor: "#FF00FF",
+               fillColor: "#ADD8E6",
                fillOpacity: .4,
                color: '#B04173',
             };
         }
-		  
+
+		//Simple styling for when a dt is selected
 		function DTSelectedStyle(feature) {
              return {
                fillColor: "#00FFFB",
@@ -120,114 +300,93 @@
             };
         }
 		
-		// handle click events on disputed territories
+		//Function to set the hover style for disputed territories
+		function DTHoverStyle(feature) {
+			return {
+				fillColor: "#00FFFB",
+				color: '#0000FF',
+				fillOpacity: .6,
+				weight: 2,
+			};
+		}
+
+		// handle click events on disputed territories (pretty much the same as our Lesson 7 & 8 function excluding the mouseover/mouseout js events).
         function highlightDTOnEachFeature(feature, layer){
             layer.on({
 				click: function(e) {
-					if (selection) {            
+					if (selection) {
 						resetStyles();
+						resetPieChart();
 					}
-              
-					e.target.setStyle(DTSelectedStyle);
+
+					e.target.setStyle(DTSelectedStyle(feature));
 					selection = e.target;
 					selectedLayer = disputedTerritoriesLayer;
 
 					// Insert some HTML with the feature name
-					buildSummaryLabel(feature);
+					//buildSummaryLabel(feature);
+
+					buildAttributeTable(feature);
+					
+					
+					buildPieChart(feature, disputedTerritoriesLayer);
+					
 
 					L.DomEvent.stopPropagation(e); // stop click event from being propagated further
-                }
+                },
+				
+				//define functionality for mouse hovering/highlighting of the disputed territories layer. If the target layer is not selected, call the function DTHoverStyle
+				//over the feature
+				 mouseover: function (e) {
+					var layer = e.target;
+					if (layer !== selection) {
+						layer.setStyle(DTHoverStyle(feature));
+					}
+				},
+				
+				//reset the feature to its normal state when the mouse is not hovering over the feature.
+				mouseout: function (e) {
+					var layer = e.target;
+					if (layer !== selection) {
+						layer.setStyle(disputedTerritories(feature));
+					}
+				},
             });
         }
-		
+
 		// add the disputedterritories GeoJSON layer using the DTGeoJSON variable from disputedterritories.js
-        disputedTerritoriesLayer = new L.geoJSON(DTGeoJSON,{
+        disputedTerritoriesLayer = new L.geoJSON(dTGeoJSON,{
             style: disputedTerritories,
 			onEachFeature: highlightDTOnEachFeature
-        });    
-               
-        disputedTerritoriesLayer.addTo(map);
+        });
 		
+		worldAdminLayer.addTo(map); //the world administrative boundary layer.
+
+        disputedTerritoriesLayer.addTo(map); //add disputed territories and redboundaries to the map (dt before rb).
+
+		redBoundariesLayer.addTo(map); //Add the two GeoJSON layers to the map. Make sure to add redboundaries AFTER DT.
+		
+		createLegend(); //add legend
+
 		// handle clicks on the map that didn't hit a feature
 		map.addEventListener('click', function(e) {
 			if (selection) {
 				resetStyles();
 				selection = null;
 				document.getElementById('summaryLabel').innerHTML = '<p>Click a red disputed boundary line or disputed territory for more information.</p>';
+				resetPieChart();
 			}
 		});
-
+		
+		//reset the style for either the redboundaries or disputedterritories layers. Whichever one was clicked.
 		function resetStyles(){
 			if (selectedLayer === redBoundariesLayer || selectedLayer === disputedTerritoriesLayer){
-				selectedLayer.resetStyle(selection);
+				selectedLayer.resetStyle(selection);	
+				resetPieChart();			
 			}
 		}
-
-		// function to build the HTML for the summary label using the selected feature's "BRK_NAME" property
-		function buildSummaryLabel(currentFeature){
-			var featureName = currentFeature.properties.BRK_NAME || "Unnamed feature";
-			document.getElementById('summaryLabel').innerHTML = '<p style="font-size:18px"><b>' + featureName + '</b></p>';
-		}
-		
-		/*
-		function Identify(e)
-		{
-			// set parameters needed for GetFeatureInfo WMS request
-			var sw = map.options.crs.project(map.getBounds().getSouthWest());
-			var ne = map.options.crs.project(map.getBounds().getNorthEast());
-			var BBOX = sw.x + "," + sw.y + "," + ne.x + "," + ne.y;
-			var WIDTH = map.getSize().x;
-			var HEIGHT = map.getSize().y;
-		
-			var X = Math.trunc(map.layerPointToContainerPoint(e.layerPoint).x);
-			var Y = Math.trunc(map.layerPointToContainerPoint(e.layerPoint).y);
-		
-			// compose the URL for the request
-			var URL = 'http://localhost:8080/geoserver/termproject/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo&LAYERS=termproject:sc_projected&QUERY_LAYERS=termproject:sc_projected&BBOX='+BBOX+'&FEATURE_COUNT=1&HEIGHT='+HEIGHT+'&WIDTH='+WIDTH+'&INFO_FORMAT=application%2Fjson&TILED=false&CRS=EPSG%3A3857&I='+X+'&J='+Y;
-
-			//send GetFeatureInfo as asynchronous HTTP request using jQuery $.ajax
-			$.ajax({
-    			url: URL,
-    			dataType: "json",
-    			type: "GET",
-    			success: function(data)
-    		         {
-						if(data.features.length !== 0) {  // at least one feature returned in response
-							var returnedFeature = data.features[0]; // first feature from response
-            
-							// Set up popup for clicked feature and open it. There's some additional added styling to the popup
-							// window. I got inspired looking at the Bikeshare map.
-							var popup = new L.Popup({
-								className: 'custom-popup'
-							});
-
-						// Construct the popup content using HTML elements with classes
-						var popupContent = "<h2>Information</h2>" + "<p><b>Territory Name:</b>" + returnedFeature.properties.BRK_NAME + "</p>" + "<p><b>Population Estimate:</b>" + returnedFeature.properties.POP_EST + "</p>" + "<p><b>COUNTRY NAME:</b>" + returnedFeature.properties.NAME + "</p>";
-
-						// Set the modified content to the popup
-						popup.setContent(popupContent);
-						popup.setLatLng(e.latlng);
-						map.openPopup(popup);
-						}
-					}
-				});
-			}		
-			map.addEventListener('click', Identify); 
-			*/
 	}
-	
-                     
         </script>
-      </head>
-      <body onload="init()">
-        <h1 id="title">Selected disputed territories for India, Pakistan, and China</h1>
-    
-        <div id="mapid">
-        </div>
-    
-        <div id="docs">
-            <p>This page shows information about disputed territories in India, Pakistan, and China. Click a region for more information.</p>
-        </div>
 
       </body>
-    </html>
+	</html>
