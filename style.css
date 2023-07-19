@@ -1,10 +1,113 @@
+/* CSS stylings for the leaflet container, side pane, attribute table and associated elements, and map legend. */
+
+/* darker background for the body of the web page */
+body {
+  background-color: rgba(0, 0, 0, 0.5); /* Darken the background with 50% opacity */
+}
+
+/* styling for the page header */
+h1 {
+  font-family: 'Roboto', sans-serif;
+  font-weight: bold;
+  text-align: center;
+}
+/* styling for the map container */
+#mapContainer {
+	display: flex;
+	background-color: rgba(0, 0, 0, 0.7);
+	border-radius: 10px;
+}
+
 #mapid {
-    width: 512px;
-    height: 512px;
+    width: 1024px;
+    height: 1024px;
     border: 1px solid #ccc;
+	flex: 1;
+}
+
+/* define styling for the side pane */
+#sidePane {
+	width: 375px;
+	background-color: rgba(0, 0, 0, 0.7);
+	padding: 10px;
+	border-radius: 10px;
+}
+
+#attributeTable {
+  padding: 10px;
+  background-color: rgba(245, 245, 245, 0.7); /* Slightly opaque background color */
+  border: 1px solid #DDD;
+  border-radius: 5px;
+  margin-top: 10px;
+  font-family: 'Your Custom Font', sans-serif; 
+  max-height: 785px; /* Set a maximum height for the container */
+  overflow: auto; /* Add scrollbars when the content exceeds the container height (no Longer needed)*/
+}
+/* styling for the attribute table header */
+#attributeTable th {
+  background-color: #EEE;
+  padding: 5px;
+  font-weight: bold; /* Make the table header text bold */
+}
+
+/* styling for data in the attribute table*/
+#attributeTable td {
+  padding: 5px;
+  font-family: 'Your Custom Font', sans-serif; /* Replace 'Your Custom Font' with your desired font name */
+}
+
+/* styling for text element in the map legend*/
+.mapLegend {
+  background-color: background-color: rgba(245, 245, 245, 0.7);
+  border-radius: 5px;
+  padding: 10px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #888888;
+}
+
+/* header for map legend*/
+.mapLegend h4 {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.mapLegend div {
+  margin-bottom: 5px;
+}
+
+/* display styling for the legend-icons */
+.legend-icon {
+  display: inline-block;
+  margin-right: 5px;
+}
+
+/* legend styling for disputed red boundaries*/
+.red-line {
+  background-color: red;
+  width: 30px;
+  height: 3px;
+}
+
+/* legend styling for disputed territories */
+.green-rectangle {
+  background-color: rgba(0, 255, 0, 0.4);
+  width: 30px;
+  height: 15px;
+  border: 2px solid #0000FF;
+}
+
+/* legend styling for world admin boundaries */
+.black-line {
+  background-color: black;
+  width: 30px;
+  height: 3px;
 }
 
 .leaflet-container {
-    background: #fff;
+    background-color: rgba(0, 0, 0, 0.7);
+	border-radius: 10px;
 }
 
